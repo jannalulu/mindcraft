@@ -11,7 +11,7 @@ import { Claude } from '../models/claude.js';
 import { ReplicateAPI } from '../models/replicate.js';
 import { Local } from '../models/local.js';
 import { GroqCloudAPI } from '../models/groq.js';
-import { HuggingFace } from '../models/huggingface.js';
+import { Hyperbolic } from '../models/hyperbolic.js';
 
 export class Prompter {
     constructor(agent, fp) {
@@ -19,7 +19,7 @@ export class Prompter {
         this.profile = JSON.parse(readFileSync(fp, 'utf8'));
         this.convo_examples = null;
         this.coding_examples = null;
-        
+       
         let name = this.profile.name;
         let chat = this.profile.model;
         this.cooldown = this.profile.cooldown ? this.profile.cooldown : 0;
@@ -27,8 +27,6 @@ export class Prompter {
 
         // try to get "max_tokens" parameter, else null
         let max_tokens = null;
-        if (this.profile.max_tokens)
-            max_tokens = this.profile.max_tokens;
         if (typeof chat === 'string' || chat instanceof String) {
             chat = {model: chat};
             if (chat.model.includes('gemini'))
@@ -37,16 +35,15 @@ export class Prompter {
                 chat.api = 'openai';
             else if (chat.model.includes('claude'))
                 chat.api = 'anthropic';
-            else if (chat.model.includes('huggingface/'))
-                chat.api = "huggingface";
             else if (chat.model.includes('meta/') || chat.model.includes('mistralai/') || chat.model.includes('replicate/'))
                 chat.api = 'replicate';
             else if (chat.model.includes("groq/") || chat.model.includes("groqcloud/"))
                 chat.api = 'groq';
+            else if (chat.model.startsWith('hyperbolic/'))
+                chat.api = 'hyperbolic';
             else
                 chat.api = 'ollama';
         }
-
         console.log('Using chat settings:', chat);
 
         if (chat.api === 'google')
@@ -62,10 +59,10 @@ export class Prompter {
         else if (chat.api === 'groq') {
             this.chat_model = new GroqCloudAPI(chat.model.replace('groq/', '').replace('groqcloud/', ''), chat.url, max_tokens ? max_tokens : 8192);
         }
-        else if (chat.api === 'huggingface')
-            this.chat_model = new HuggingFace(chat.model, chat.url);
+        else if (chat.api === 'hyperbolic')
+            this.chat_model = new Hyperbolic(chat.model, chat.url);
         else
-            throw new Error('Unknown API:', api);
+            throw new Error(`Unknown API: ${chat.api}`);
 
         let embedding = this.profile.embedding;
         if (embedding === undefined) {
@@ -78,7 +75,6 @@ export class Prompter {
             embedding = {api: embedding};
 
         console.log('Using embedding settings:', embedding);
-
         if (embedding.api === 'google')
             this.embedding_model = new Gemini(embedding.model, embedding.url);
         else if (embedding.api === 'openai')
